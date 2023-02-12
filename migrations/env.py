@@ -13,8 +13,6 @@ from alembic import context
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
-
-from app.models import *
 from app.config import settings
 
 # this is the Alembic Config object, which provides
@@ -33,6 +31,10 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
+
+# add models
+from app.models.user import User
+
 # target_metadata = mymodel.Base.metadata
 target_metadata = SQLModel.metadata
 

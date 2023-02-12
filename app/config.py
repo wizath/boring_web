@@ -16,6 +16,7 @@ class Config(BaseSettings):
     TESTING: bool = False
     SECRET_KEY: str = os.environ.get('SECRET_KEY', '41f62834-0071-11e6-a247-000ec6c2372c')
     DATABASE_URL: str = os.environ.get('DATABASE_URL', 'sqlite+aiosqlite:///sqlite.db')
+    SYNC_DATABASE_URL: str = os.environ.get('DATABASE_URL', 'sqlite:///sqlite.db')
     TITLE: str = "Boring WEB"
     VERSION: str = "0.1"
 
@@ -36,6 +37,7 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     TESTING = True
+    DEBUG = False
     DATABASE_URL = 'sqlite+aiosqlite:///sqlite.db'
 
 
