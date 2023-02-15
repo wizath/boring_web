@@ -7,6 +7,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     password: Optional[str]
     is_superuser: bool = False
+    is_active: bool = False
     username: str
     name: str
     email: str
@@ -15,4 +16,4 @@ class User(SQLModel, table=True):
         self.password = get_hashed_password(password)
 
     def check_password(self, password):
-        return verify_password(self.password, password)
+        return verify_password(password, self.password)

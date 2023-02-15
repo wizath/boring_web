@@ -35,6 +35,7 @@ def upgrade():
 @cli.command(short_help="Add new alembic revision")
 @click.argument('name')
 def revision(name):
+    # TODO: FIX BROKEN ARGUMENT
     alembic_args = [
         '--raiseerr',
         'revision', '--autogenerate', name,
@@ -53,6 +54,7 @@ def superuser():
     session = get_local_session()
     user = User(username='admin', email='admin@admin.com', name='admin')
     user.is_superuser = True
+    user.is_active = True
     user.set_password('admin1234')
     session.add(user)
     session.commit()

@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from http import cookies
 
 import jwt
 import pytest
@@ -14,7 +15,7 @@ from app.tests.conftest import app
 
 
 @pytest.mark.asyncio
-class TestTokenAuth:
+class TestCookieAuth:
 
     @pytest.fixture(autouse=True)
     async def set_up(self, async_session: AsyncSession):
@@ -23,33 +24,29 @@ class TestTokenAuth:
         async_session.add(user)
         await async_session.commit()
 
-    async def test_authorization_no_header(self, async_client: AsyncClient):
-        response = await async_client.get(app.url_path_for('verify'))
-
-        assert "Invalid token" in response.text
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-
-    async def test_authorization_wrong_header(self, async_client: AsyncClient):
-        async_client.headers.update({
-            'authorization': f'Token wrong'
-        })
-        response = await async_client.get(app.url_path_for('verify'))
-
-        assert "Invalid token" in response.text
-        assert response.status_code == status.HTTP_403_FORBIDDEN
-
     async def test_authorization_proper(self, async_client: AsyncClient):
         token = AccessToken.encode({'uid': 1})
-        async_client.headers.update({
-            'authorization': f'Bearer {token}'
 
-        })
+        async_client.cookies.set('access_token', token)
         response = await async_client.get(app.url_path_for('verify'))
 
         assert response.status_code == status.HTTP_200_OK
         assert 'uid' in response.text
 
-    async def test_authorization_expired_token(self, async_client: AsyncClient):
+    async def test_authorization_no_cookie(self, async_client: AsyncClient):
+        response = await async_client.get(app.url_path_for('verify'))
+
+        assert "Invalid token" in response.text
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    async def test_authorization_wrong_cookie(self, async_client: AsyncClient):
+        async_client.cookies.set('access_token', 'wrongcookie')
+        response = await async_client.get(app.url_path_for('verify'))
+
+        assert "Invalid token" in response.text
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    async def test_authorization_expired_cookie(self, async_client: AsyncClient):
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         dt = now - datetime.timedelta(minutes=1)
         token = jwt.encode({
@@ -60,16 +57,13 @@ class TestTokenAuth:
             'iss': AccessToken.issuer
         }, settings.SECRET_KEY, algorithm='HS256')
 
-        async_client.headers.update({
-            'authorization': f'Bearer {token}'
-
-        })
+        async_client.cookies.set('access_token', token)
         response = await async_client.get(app.url_path_for('verify'))
 
-        assert 'Invalid token' in response.text
+        assert "Invalid token" in response.text
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    async def test_authorization_wrong_user(self, async_client: AsyncClient):
+    async def test_authorization_wrong_user_cookie(self, async_client: AsyncClient):
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         issued = now - datetime.timedelta(minutes=1)
         dt = now + datetime.timedelta(minutes=1)
@@ -81,16 +75,13 @@ class TestTokenAuth:
             'iss': AccessToken.issuer
         }, settings.SECRET_KEY, algorithm='HS256')
 
-        async_client.headers.update({
-            'authorization': f'Bearer {token}'
-
-        })
+        async_client.cookies.set('access_token', token)
         response = await async_client.get(app.url_path_for('verify'))
 
         assert 'Wrong user credentials' in response.text
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    async def test_authorization_disabled_user(self, async_client: AsyncClient):
+    async def test_authorization_disabled_user_cookie(self, async_client: AsyncClient):
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         issued = now - datetime.timedelta(minutes=1)
         dt = now + datetime.timedelta(minutes=1)
@@ -102,10 +93,7 @@ class TestTokenAuth:
             'iss': AccessToken.issuer
         }, settings.SECRET_KEY, algorithm='HS256')
 
-        async_client.headers.update({
-            'authorization': f'Bearer {token}'
-
-        })
+        async_client.cookies.set('access_token', token)
         response = await async_client.get(app.url_path_for('verify'))
 
         assert 'Wrong user credentials' in response.text
