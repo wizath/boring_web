@@ -1,6 +1,9 @@
 from typing import Optional
-from app.auth import verify_password, get_hashed_password
+
+from pydantic import PrivateAttr
 from sqlmodel import SQLModel, Field
+
+from app.auth import verify_password, get_hashed_password
 
 
 class User(SQLModel, table=True):
@@ -11,6 +14,14 @@ class User(SQLModel, table=True):
     username: str
     name: str
     email: str
+    _token: str = PrivateAttr(default=None)
+
+    @property
+    def token(self):
+        return self._token
+
+    def set_token(self, token):
+        self._token = token
 
     def set_password(self, password):
         self.password = get_hashed_password(password)

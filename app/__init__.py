@@ -9,7 +9,7 @@ from app.api_v1 import api_router
 
 
 def get_application() -> FastAPI:
-    logging.info(f"Starting app {settings.TITLE} version {settings.VERSION} config {os.environ.get('APP_CONFIG')}")
+    print(f"Starting app {settings.TITLE} version {settings.VERSION} config {settings.__class__}")
 
     application = FastAPI(**settings.fastapi_kwargs)
     application.add_middleware(

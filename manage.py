@@ -45,6 +45,7 @@ def revision(name):
 
 @cli.command(short_help="Run a uvicorn server")
 def runserver():
+    os.environ['APP_CONFIG'] = 'development'
     log_level = "debug" if settings.DEBUG else "info"
     uvicorn.run("app:app", host=settings.HOST, port=settings.PORT, log_level=log_level, reload=settings.DEBUG)
 

@@ -1,6 +1,8 @@
 import asyncio
+import json
 from typing import Generator
 
+import httpx
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -8,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app import app
+from app import app, settings
 from app.database import async_engine
 
 
@@ -21,6 +23,7 @@ def event_loop(request) -> Generator:  # noqa: indirect usage
 
 @pytest_asyncio.fixture
 async def async_client():
+    settings.TESTING = True
     async with AsyncClient(app=app, base_url=f"http://127.0.0.1:8000") as client:
         yield client
 
@@ -39,3 +42,10 @@ async def async_session() -> AsyncSession:
         await conn.run_sync(SQLModel.metadata.drop_all)
 
     await async_engine.dispose()
+
+
+def response_json(response: httpx.Response) -> dict:
+    try:
+        return json.loads(response.text)
+    except json.decoder.JSONDecodeError:
+        return {}

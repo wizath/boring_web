@@ -34,6 +34,7 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # add models
 from app.models.user import User
+from app.models.token import UserRefreshToken
 
 # target_metadata = mymodel.Base.metadata
 target_metadata = SQLModel.metadata

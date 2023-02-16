@@ -1,3 +1,6 @@
+import logging
+import os
+
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import create_engine, Session
@@ -13,6 +16,7 @@ def get_local_session() -> Session:
 
 
 async def get_async_session() -> AsyncSession:
-    async_session = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+    print(f'opening database {settings.DATABASE_URL} {os.getcwd()}')
+    async_session = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False, autocommit=False)
     async with async_session() as session:
         yield session

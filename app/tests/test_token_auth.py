@@ -5,11 +5,13 @@ import jwt
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 from starlette import status
 
 from app import settings
 from app.auth.tokens import AccessToken
 from app.models.user import User
+from app.models.token import UserRefreshToken
 from app.tests.conftest import app
 
 
@@ -62,7 +64,6 @@ class TestTokenAuth:
 
         async_client.headers.update({
             'authorization': f'Bearer {token}'
-
         })
         response = await async_client.get(app.url_path_for('verify'))
 

@@ -1,6 +1,5 @@
 import datetime
 import uuid
-from http import cookies
 
 import jwt
 import pytest
