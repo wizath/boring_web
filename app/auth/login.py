@@ -9,7 +9,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.responses import JSONResponse
 
-from app.auth.tokens import AccessToken, RefreshToken, Token
+from app.auth.tokens import AccessToken, RefreshToken
 from app.database import get_async_session
 from app.models import UserRefreshToken
 from app.models.user import User
@@ -27,48 +27,60 @@ async def authenticate(login: str, password: str, db: AsyncSession):
     return user
 
 
-async def auth_generate_tokens(request: Request, user: User, db: AsyncSession):
+async def auth_generate_tokens(request: Request, user: User, db: AsyncSession, access_token=True, refresh_token=True):
     data = {}
-    access_token = AccessToken.encode({'uid': user.id})
-    refresh_token = RefreshToken.encode({'uid': user.id})
+    if access_token:
+        access_token = AccessToken.encode({'uid': user.id})
 
-    ip_address = request.client.host
-    user_agent = request.headers.get('user-agent', None)
+    if refresh_token:
+        refresh_token = RefreshToken.encode({'uid': user.id})
 
-    # create refresh token db record
-    await UserRefreshToken.from_token(db, user, refresh_token, ip_address, user_agent)
+        ip_address = request.client.host
+        user_agent = request.headers.get('user-agent', None)
 
-    data['access_token'] = access_token
-    data['refresh_token'] = refresh_token
-    data['access_expire'] = datetime.datetime.utcnow() + AccessToken.expire_time
-    data['refresh_expire'] = datetime.datetime.utcnow() + RefreshToken.expire_time
+        # create refresh token db record
+        await UserRefreshToken.from_token(db, user, refresh_token, ip_address, user_agent)
+
+    if access_token:
+        data['access_token'] = access_token
+        data['access_expire'] = datetime.datetime.utcnow() + AccessToken.expire_time
+
+    if refresh_token:
+        data['refresh_token'] = refresh_token
+        data['refresh_expire'] = datetime.datetime.utcnow() + RefreshToken.expire_time
+
     data['uid'] = user.id
 
     return data
 
 
 def auth_token_response(tokens: dict, return_token=False, return_cookie=False):
-    access_expire = tokens['access_expire']
-    refresh_expire = tokens['refresh_expire']
+    access_expire = tokens.get('access_expire', None)
+    refresh_expire = tokens.get('refresh_expire', None)
 
     response = {
-        'access_expire': int(access_expire.timestamp()),
-        'refresh_expire': int(refresh_expire.timestamp()),
         'uid': tokens['uid']
     }
 
-    if return_token:
-        response['access_token'] = tokens['access_token']
-        response['refresh_token'] = tokens['refresh_token']
+    if access_expire:
+        response['access_expire']: int(access_expire.timestamp())
+        if return_token:
+            response['access_token'] = tokens['access_token']
+
+    if refresh_expire:
+        response['refresh_expire']: int(refresh_expire.timestamp())
+        if return_token:
+            response['refresh_token'] = tokens['refresh_token']
 
     response = JSONResponse(content=response)
 
-    if return_cookie:
+    if return_cookie and access_expire:
         response.set_cookie(key="access_token",
                             value=tokens['access_token'],
                             secure=True,
                             expires=int(AccessToken.expire_time.total_seconds()))
 
+    if return_cookie and refresh_expire:
         response.set_cookie(key="refresh_token",
                             value=tokens['refresh_token'],
                             secure=True,
@@ -91,9 +103,11 @@ async def auth_verify_token(token, db: AsyncSession, token_class: Union[AccessTo
     if not user.is_active:
         HTTPException(status_code=403, detail="User is not active")
 
-    # if token_class == RefreshToken:
-    #     if UserRefreshToken.objects.filter(jti=payload.get('jti'), blacklisted=True).exists():
-    #         raise exceptions.AuthenticationFailed('Token is blacklisted')
+    if token_class == RefreshToken:
+        query = select(UserRefreshToken).where(UserRefreshToken.jti == payload.get('jti'),
+                                               UserRefreshToken.blacklisted is True)
+        if (await db.execute(query)).scalars().first():
+            raise HTTPException(status_code=403, detail="Invalid token")
 
     return user
 
@@ -131,13 +145,9 @@ async def auth_refresh_token_required(request: Request, db: AsyncSession = Depen
     return await auth_check_token(request, db, token_class=RefreshToken)
 
 
-async def auth_clear_tokens(user: User, db: AsyncSession):
-    response = JSONResponse(content={})
-    response.delete_cookie('refresh_token')
-    response.delete_cookie('access_token')
-
+async def auth_blacklist_refresh_token(token: str, db: AsyncSession):
     try:
-        payload = RefreshToken.decode(user.token)
+        payload = RefreshToken.decode(token)
     except jwt.exceptions.InvalidTokenError:
         payload = None
 
@@ -149,5 +159,13 @@ async def auth_clear_tokens(user: User, db: AsyncSession):
             token.blacklisted_at = datetime.datetime.utcnow()
             db.add(token)
             await db.commit()
+
+
+async def auth_clear_tokens(user: User, db: AsyncSession):
+    response = JSONResponse(content={})
+    response.delete_cookie('refresh_token')
+    response.delete_cookie('access_token')
+
+    await auth_blacklist_refresh_token(user.token, db)
 
     return response

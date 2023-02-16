@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.responses import JSONResponse
 
 from app.auth.login import authenticate, auth_token_response, auth_generate_tokens, auth_access_token_required, \
-    auth_clear_tokens, auth_refresh_token_required
+    auth_clear_tokens, auth_refresh_token_required, auth_blacklist_refresh_token
 from app.database import get_async_session
 from app.models.user import User
 
@@ -54,3 +54,25 @@ async def verify(user: User = Depends(auth_access_token_required)):
 async def logout(user: User = Depends(auth_refresh_token_required),
                  db: AsyncSession = Depends(get_async_session)) -> JSONResponse:
     return await auth_clear_tokens(user, db)
+
+
+@router.post('/refresh')
+async def token_refresh(request: Request,
+                        user: User = Depends(auth_refresh_token_required),
+                        db: AsyncSession = Depends(get_async_session)) -> JSONResponse:
+    tokens = await auth_generate_tokens(request, user, db, refresh_token=False)
+    await auth_blacklist_refresh_token(user.token, db)
+
+    cookie_present = request.cookies.get('refresh_token', None) is not None
+    return auth_token_response(tokens, return_token=not cookie_present, return_cookie=cookie_present)
+
+
+@router.post('/refresh/pair')
+async def dual_token_refresh(request: Request,
+                             user: User = Depends(auth_refresh_token_required),
+                             db: AsyncSession = Depends(get_async_session)) -> JSONResponse:
+    tokens = await auth_generate_tokens(request, user, db)
+    await auth_blacklist_refresh_token(user.token, db)
+
+    cookie_present = request.cookies.get('refresh_token', None) is not None
+    return auth_token_response(tokens, return_token=not cookie_present, return_cookie=cookie_present)
